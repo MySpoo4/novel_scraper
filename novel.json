@@ -1,0 +1,17 @@
+{
+  "novel": {
+    "meta_data": {
+      "title": "Sample Title",
+      "author": "Sample Author
+    },
+    "site": {
+      "url": "Sample Url",
+      "identifiers": {
+        "next_btn": "btn identifier",
+        "title": "title identifier",
+        "body": "body identifier"
+      }
+    }
+  },
+  "excluded_words" : []
+}
