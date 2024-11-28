@@ -40,11 +40,14 @@ impl ScraperClient {
 
     pub fn get_text(&mut self, identifier: &str) -> Option<String> {
         let separator = format!("\n\n{}\n\n", char::from_u32(8200).unwrap());
-        let punctuation_re = Regex::new(r"^[[:punct:]]+$").unwrap();
+        const PUNC_COUNT: usize = 3;
         self.get_elements(identifier).map(|s| {
             s.flat_map(|e| e.text())
                 .map(|s| s.trim())
-                .filter(|s| !punctuation_re.is_match(s) && !s.is_empty())
+                .filter(|s| {
+                    !s.chars().filter(|c| c.is_ascii_punctuation()).count() < PUNC_COUNT
+                        && !s.is_empty()
+                })
                 .collect::<Vec<&str>>()
                 .join(&separator)
         })
