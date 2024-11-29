@@ -2,6 +2,7 @@ use std::{fmt, result};
 
 #[derive(Debug)]
 pub enum Error {
+    ElementError { selector: String },
     AttributeError { selector: String, attr: String },
     ClientBuildError,
     ProxyError,
@@ -15,6 +16,7 @@ impl std::error::Error for Error {}
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Error::ElementError { selector } => write!(f, "Failed to find element: '{}'", selector),
             Error::AttributeError { selector, attr } => write!(
                 f,
                 "Failed to retrieve attribute: '{}' from selector: '{}'.",
