@@ -1,4 +1,5 @@
 use fantoccini::{Client, ClientBuilder, Locator};
+use futures::future::join_all;
 use serde_json::{json, Map};
 use std::process::{Child, Command};
 
@@ -12,17 +13,20 @@ pub struct HttpClient {
 
 impl HttpClient {
     pub async fn new(proxy: Option<&str>) -> Result<Self> {
+        const PORT: &str = "8000";
         let driver = Command::new("geckodriver")
             .arg("--port")
-            .arg("4444")
+            .arg(PORT)
+            .stdout(std::process::Stdio::null()) // disables logs
+            .stderr(std::process::Stdio::null())
             .spawn()
             .map_err(|e| Error::CommandError {
-                cmd: "geckodriver --port 4444".to_string(),
+                cmd: format!("geckodriver --port {}", PORT),
                 message: e.to_string(),
             })?;
 
         // Default host for geckodriver
-        const HOST: &str = "http://localhost:4444";
+        let host: String = format!("http://localhost:{}", PORT);
 
         // Always return a valid map, either with proxy settings or empty
         let capabilities = Self::build_capabilities(proxy);
@@ -30,7 +34,7 @@ impl HttpClient {
         // Initialize the client with the capabilities
         let client = ClientBuilder::native()
             .capabilities(capabilities) // Pass the map (not Option)
-            .connect(HOST)
+            .connect(&host)
             .await
             .map_err(|_| Error::ClientBuildError)?;
 
@@ -62,6 +66,13 @@ impl HttpClient {
             capabilities.insert("proxy".to_string(), proxy_config);
         }
 
+        // capabilities.insert(
+        //     "moz:firefoxOptions".to_string(),
+        //     json!({
+        //         "args": ["--headless"],
+        //     }),
+        // );
+
         // Return the capabilities map, which may be empty or contain the proxy
         capabilities
     }
@@ -76,6 +87,14 @@ impl HttpClient {
             })?;
 
         self.client
+            .wait()
+            .for_element(Locator::Css("body"))
+            .await
+            .map_err(|_e| Error::ElementError {
+                selector: "body".to_string(),
+            })?;
+
+        self.client
             .find(Locator::Css("body"))
             .await
             .map_err(|_e| Error::ElementError {
@@ -87,5 +106,47 @@ impl HttpClient {
                 selector: "body".to_string(),
                 attr: "html".to_string(),
             })
+    }
+
+    pub async fn get_attr_xpath(&self, xpath: &str, attr: &str) -> Option<String> {
+        self.client
+            .find(Locator::XPath(xpath))
+            .await
+            .ok()?
+            .attr(attr)
+            .await
+            .ok()?
+    }
+
+    pub async fn get_text_xpath<F>(&self, xpath: &str, separator: &str, filter: F) -> Option<String>
+    where
+        F: Fn(&str) -> bool,
+    {
+        // Find all elements matching the XPath and map their text
+        let elements = self
+            .client
+            .find_all(Locator::XPath(xpath))
+            .await
+            .map_err(|_e| Error::ElementError {
+                selector: xpath.to_string(),
+            })
+            .ok()?;
+
+        // Collect the futures to resolve
+        let texts = elements.iter().map(|e| e.text()).collect::<Vec<_>>();
+
+        // Resolve all futures concurrently
+        let resolved_texts = join_all(texts).await;
+
+        // Process the resolved texts
+        let result = resolved_texts
+            .into_iter()
+            .filter_map(|res| res.ok())
+            .map(|s| s.trim().to_string())
+            .filter(|s| filter(s))
+            .collect::<Vec<String>>()
+            .join(separator);
+
+        Some(result)
     }
 }

@@ -9,14 +9,26 @@ pub struct Novel {
 #[derive(Debug, Deserialize)]
 pub struct Site {
     pub url: String,
-    pub identifiers: Identifiers,
+    pub identifiers: Selectors,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Identifiers {
-    pub next_btn: String,
-    pub title: String,
-    pub body: String,
+pub struct Selectors {
+    pub next_btn: Selector,
+    pub title: Selector,
+    pub body: Selector,
+}
+
+#[derive(Debug, Deserialize)]
+pub enum SelectorType {
+    XPATH,
+    CSS,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Selector {
+    pub selector_type: SelectorType,
+    pub val: String,
 }
 
 #[derive(Debug, Deserialize)]

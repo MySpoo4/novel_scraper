@@ -4,4 +4,4 @@ pub mod novel;
 
 pub use chapter::Chapter;
 pub use exclude::ExcludedWords;
-pub use novel::{Identifiers, MetaData, Novel, Site};
+pub use novel::{MetaData, Novel, Selector, SelectorType, Selectors, Site};

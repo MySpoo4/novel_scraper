@@ -1,4 +1,6 @@
+use crate::models::{Selector as NSelector, SelectorType};
 use crate::{client::HttpClient, errors::Result};
+use futures::executor::block_on;
 use regex::Regex;
 use scraper::{
     html::{Html, Select},
@@ -42,25 +44,46 @@ impl ScraperClient {
         }
     }
 
-    pub fn get_text(&mut self, identifier: &str) -> Option<String> {
-        let separator = format!("\n\n{}\n\n", char::from_u32(8200).unwrap());
+    pub fn get_text(&mut self, selector: &NSelector) -> Option<String> {
         const PUNC_COUNT: usize = 3;
-        self.get_elements(identifier).map(|s| {
-            s.flat_map(|e| e.text())
-                .map(|s| s.trim())
-                .filter(|s| {
-                    !s.chars().filter(|c| c.is_ascii_punctuation()).count() < PUNC_COUNT
-                        && !s.is_empty()
-                })
-                .collect::<Vec<&str>>()
-                .join(&separator)
-        })
+        let separator = format!("\n\n{}\n\n", char::from_u32(8200).unwrap());
+        let filter = |s: &str| -> bool {
+            !s.is_empty() && {
+                let punctuation_count = s.chars().filter(|c| c.is_ascii_punctuation()).count();
+                punctuation_count == s.len() && punctuation_count > PUNC_COUNT
+                    || punctuation_count != s.len()
+            }
+        };
+
+        match selector.selector_type {
+            SelectorType::XPATH => block_on(self.client.get_text_xpath(
+                &selector.val,
+                &separator,
+                filter,
+            )),
+            SelectorType::CSS => self.get_elements(&selector.val).map(|s| {
+                s.flat_map(|e| e.text())
+                    .map(|s| s.trim())
+                    .filter(|s| filter(s))
+                    .collect::<Vec<&str>>()
+                    .join(&separator)
+            }),
+        }
     }
 
-    pub fn get_element_attribute(&mut self, identifier: &str, attribute: &str) -> Option<&str> {
-        self.get_elements(identifier)
-            .and_then(|mut s| s.next())
-            .and_then(|e| e.attr(attribute))
+    pub fn get_element_attribute(
+        &mut self,
+        selector: &NSelector,
+        attribute: &str,
+    ) -> Option<String> {
+        match selector.selector_type {
+            SelectorType::XPATH => block_on(self.client.get_attr_xpath(&selector.val, attribute)),
+            SelectorType::CSS => self
+                .get_elements(&selector.val)
+                .and_then(|mut s| s.next())
+                .and_then(|e| e.attr(attribute))
+                .map(|s| s.to_string()),
+        }
     }
 
     fn get_elements<'a>(&'a mut self, identifier: &str) -> Option<Select<'a, 'a>> {

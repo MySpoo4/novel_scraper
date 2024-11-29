@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use super::ScraperClient;
 use crate::epub::Epub;
 use crate::errors::{Error, Result};
-use crate::models::{Chapter, ExcludedWords, Novel};
+use crate::models::{Chapter, ExcludedWords, Novel, Selector};
 
 pub struct Runner {
     client: ScraperClient,
@@ -34,12 +34,9 @@ impl Runner {
     }
 
     async fn build_epub(&mut self, epub: &mut Epub) -> Result<()> {
-        let mut cur_url: Option<&str> = Some(self.novel.site.url.as_ref());
+        let mut cur_url: Option<String> = Some(self.novel.site.url.clone());
         while let Some(url) = cur_url {
-            {
-                let url = url.to_string();
-                self.client.scrape_url(url.as_ref()).await?;
-            }
+            self.client.scrape_url(url.as_ref()).await?;
 
             let chapter = Self::get_text(
                 &mut self.client,
@@ -54,14 +51,18 @@ impl Runner {
         Ok(())
     }
 
-    fn get_next_url(&mut self) -> Option<&str> {
-        let btn = self.novel.site.identifiers.next_btn.as_ref();
-        self.client.get_element_attribute(btn, "href")
+    fn get_next_url(&mut self) -> Option<String> {
+        self.client
+            .get_element_attribute(&self.novel.site.identifiers.next_btn, "href")
     }
 
-    fn get_text(client: &mut ScraperClient, title: &str, body: &str) -> Result<Chapter> {
-        let title: Option<String> = client.get_text(title);
-        let body: Option<String> = client.get_text(body);
+    fn get_text(
+        client: &mut ScraperClient,
+        title_selector: &Selector,
+        body_selector: &Selector,
+    ) -> Result<Chapter> {
+        let title: Option<String> = client.get_text(title_selector);
+        let body: Option<String> = client.get_text(body_selector);
 
         title
             .zip(body)
