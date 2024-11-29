@@ -11,8 +11,12 @@ pub struct Runner {
 }
 
 impl Runner {
-    pub fn new(novel: Novel, excluded_words: ExcludedWords, proxy: Option<&str>) -> Result<Self> {
-        let mut client = ScraperClient::new(proxy)?;
+    pub async fn new(
+        novel: Novel,
+        excluded_words: ExcludedWords,
+        proxy: Option<&str>,
+    ) -> Result<Self> {
+        let mut client = ScraperClient::new(proxy).await?;
         client.add_excluded_words(excluded_words.excluded_words);
         Ok(Runner { client, novel })
     }

@@ -26,7 +26,7 @@ async fn main() {
 
     let (novel, excluded_words) = get_fields(args.novel_path);
 
-    let runner_result = Runner::new(novel, excluded_words, args.proxy_url.as_deref());
+    let runner_result = Runner::new(novel, excluded_words, args.proxy_url.as_deref()).await;
     match runner_result {
         Ok(mut runner) => runner
             .run(args.output_path)

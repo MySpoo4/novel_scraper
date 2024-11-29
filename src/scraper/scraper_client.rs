@@ -5,7 +5,7 @@ use scraper::{
     Selector,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ScraperClient {
     client: HttpClient,
     excluded_words: Vec<String>,
@@ -14,9 +14,9 @@ pub struct ScraperClient {
 }
 
 impl ScraperClient {
-    pub fn new(proxy: Option<&str>) -> Result<Self> {
+    pub async fn new(proxy: Option<&str>) -> Result<Self> {
         Ok(ScraperClient {
-            client: HttpClient::new(proxy)?,
+            client: HttpClient::new(proxy).await?,
             excluded_words: Vec::new(),
             document: None,
             selector: None,

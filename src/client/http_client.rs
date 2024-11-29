@@ -1,46 +1,70 @@
-use reqwest::{Client, Proxy};
+use fantoccini::{Client, ClientBuilder, Locator};
+use serde_json::{json, Map};
 
 use crate::errors::{Error, Result};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct HttpClient {
     client: Client,
 }
 
 impl HttpClient {
-    pub fn new(proxy: Option<&str>) -> Result<Self> {
-        let client = match proxy {
-            Some(proxy_url) => {
-                let proxy = Proxy::all(proxy_url).map_err(|_| Error::ProxyError)?;
-                Client::builder()
-                    .proxy(proxy)
-                    .build()
-                    .map_err(|_| Error::ClientBuildError)?
-            }
-            None => Client::new(),
-        };
+    pub async fn new(proxy: Option<&str>) -> Result<Self> {
+        // Default host for geckodriver
+        const HOST: &str = "http://localhost:4444";
+
+        // Always return a valid map, either with proxy settings or empty
+        let capabilities = Self::build_capabilities(proxy);
+
+        // Initialize the client with the capabilities
+        let client = ClientBuilder::native()
+            .capabilities(capabilities) // Pass the map (not Option)
+            .connect(HOST)
+            .await
+            .map_err(|_| Error::ClientBuildError)?;
+
         Ok(HttpClient { client })
     }
 
+    fn build_capabilities(proxy: Option<&str>) -> Map<String, serde_json::Value> {
+        let mut capabilities = Map::new();
+
+        // If a proxy is provided, add the proxy settings
+        if let Some(proxy) = proxy {
+            let proxy_config = json!({
+                "proxyType": "manual",
+                "httpProxy": proxy,
+                "sslProxy": proxy,
+                "ftpProxy": proxy,
+                "noProxy": "" // Optional: Domains to exclude
+            });
+            capabilities.insert("proxy".to_string(), proxy_config);
+        }
+
+        // Return the capabilities map, which may be empty or contain the proxy
+        capabilities
+    }
+
     pub async fn get_html<'a>(&self, url: &'a str) -> Result<String> {
-        let html = match self.client.get(url).send().await {
-            Ok(res) if res.status().is_success() => Ok(html_escape::decode_html_entities(
-                res.text().await.unwrap_or_default().as_str(),
-            )
-            .into_owned()),
-            Ok(res) => Err(Error::RequestError {
-                url: url.to_string(),
-                message: format!(
-                    "Failed to retrieve the webpage. Status code: {}",
-                    res.status()
-                ),
-            }),
-            Err(e) => Err(Error::RequestError {
+        self.client
+            .goto(url)
+            .await
+            .map_err(|e| Error::RequestError {
                 url: url.to_string(),
                 message: e.to_string(),
-            }),
-        };
+            })?;
 
-        html
+        self.client
+            .find(Locator::Css("body"))
+            .await
+            .map_err(|_e| Error::ElementError {
+                selector: "body".to_string(),
+            })?
+            .html(true)
+            .await
+            .map_err(|_e| Error::AttributeError {
+                selector: "body".to_string(),
+                attr: "html".to_string(),
+            })
     }
 }
