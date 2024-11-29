@@ -23,6 +23,10 @@ impl ScraperClient {
         })
     }
 
+    pub async fn close(self) -> Result<()> {
+        self.client.close().await
+    }
+
     pub fn add_excluded_words(&mut self, words: Vec<String>) {
         self.excluded_words.extend(words);
     }

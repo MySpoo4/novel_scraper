@@ -1,15 +1,26 @@
 use fantoccini::{Client, ClientBuilder, Locator};
 use serde_json::{json, Map};
+use std::process::{Child, Command};
 
 use crate::errors::{Error, Result};
 
 #[derive(Debug)]
 pub struct HttpClient {
     client: Client,
+    driver: Child,
 }
 
 impl HttpClient {
     pub async fn new(proxy: Option<&str>) -> Result<Self> {
+        let driver = Command::new("geckodriver")
+            .arg("--port")
+            .arg("4444")
+            .spawn()
+            .map_err(|e| Error::CommandError {
+                cmd: "geckodriver --port 4444".to_string(),
+                message: e.to_string(),
+            })?;
+
         // Default host for geckodriver
         const HOST: &str = "http://localhost:4444";
 
@@ -23,7 +34,17 @@ impl HttpClient {
             .await
             .map_err(|_| Error::ClientBuildError)?;
 
-        Ok(HttpClient { client })
+        Ok(HttpClient { client, driver })
+    }
+
+    pub async fn close(mut self) -> Result<()> {
+        let _ = self.driver.kill().map_err(|e| Error::Error {
+            message: e.to_string(),
+        })?;
+        let _ = self.client.close().await.map_err(|e| Error::Error {
+            message: e.to_string(),
+        })?;
+        Ok(())
     }
 
     fn build_capabilities(proxy: Option<&str>) -> Map<String, serde_json::Value> {

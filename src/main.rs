@@ -28,10 +28,16 @@ async fn main() {
 
     let runner_result = Runner::new(novel, excluded_words, args.proxy_url.as_deref()).await;
     match runner_result {
-        Ok(mut runner) => runner
-            .run(args.output_path)
-            .await
-            .map_or_else(|e| eprintln!("{}", e), |_| println!("Done!")),
+        Ok(mut runner) => {
+            runner
+                .run(args.output_path)
+                .await
+                .map_or_else(|e| eprintln!("{}", e), |_| println!("Done!"));
+
+            if let Err(e) = runner.close().await {
+                eprintln!("Error closing runner: {}", e);
+            }
+        }
         Err(e) => {
             eprintln!("Error creating Runner: {}", e);
         }

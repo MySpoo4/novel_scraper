@@ -29,6 +29,10 @@ impl Runner {
         Ok(())
     }
 
+    pub async fn close(self) -> Result<()> {
+        self.client.close().await
+    }
+
     async fn build_epub(&mut self, epub: &mut Epub) -> Result<()> {
         let mut cur_url: Option<&str> = Some(self.novel.site.url.as_ref());
         while let Some(url) = cur_url {
